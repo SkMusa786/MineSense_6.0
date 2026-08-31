@@ -1,0 +1,9 @@
+{
+  "node_id": "N01",
+  "timestamp_utc": "2026-08-26T17:00:00Z",
+  "tilt_x_deg": 0.5,
+  "tilt_y_deg": 0.35,
+  "displacement_mm": 5.5,
+  "vibration_g": 0.04,
+  "crack_width_mm": 0.15
+}

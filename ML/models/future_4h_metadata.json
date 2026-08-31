@@ -1,0 +1,129 @@
+{
+  "horizon_hours": 4,
+  "feature_columns": [
+    "tilt_x_deg",
+    "tilt_y_deg",
+    "tilt_magnitude_deg",
+    "displacement_mm",
+    "displacement_change_mm",
+    "displacement_rate_mm_per_hour",
+    "distance_to_neighbor_m",
+    "vibration_g",
+    "crack_width_mm",
+    "crack_change_mm",
+    "displacement_vs_network_mean_mm",
+    "displacement_mean_3",
+    "crack_mean_3",
+    "vibration_mean_3",
+    "tilt_magnitude_mean_3",
+    "displacement_max_3",
+    "displacement_mean_6",
+    "crack_mean_6",
+    "vibration_mean_6",
+    "tilt_magnitude_mean_6",
+    "displacement_max_6",
+    "displacement_mean_12",
+    "crack_mean_12",
+    "vibration_mean_12",
+    "tilt_magnitude_mean_12",
+    "displacement_max_12",
+    "displacement_mean_24",
+    "crack_mean_24",
+    "vibration_mean_24",
+    "tilt_magnitude_mean_24",
+    "displacement_max_24",
+    "displacement_trend_6",
+    "crack_trend_6",
+    "vibration_trend_6",
+    "tilt_magnitude_trend_6",
+    "displacement_trend_12",
+    "crack_trend_12",
+    "vibration_trend_12",
+    "tilt_magnitude_trend_12",
+    "displacement_trend_24",
+    "crack_trend_24",
+    "vibration_trend_24",
+    "tilt_magnitude_trend_24"
+  ],
+  "train_samples": 19992,
+  "val_samples": 4284,
+  "test_samples": 4284,
+  "risk_order": [
+    "NORMAL",
+    "WATCH",
+    "WARNING",
+    "CRITICAL"
+  ],
+  "validation_metrics": {
+    "accuracy": 0.5525210084033614,
+    "precision_macro": 0.5661576582010123,
+    "recall_macro": 0.586956811756277,
+    "f1_macro": 0.5689845665201598,
+    "precision_weighted": 0.5303035080398597,
+    "recall_weighted": 0.5525210084033614,
+    "f1_weighted": 0.5313423201032523,
+    "confusion_matrix": [
+      [
+        1586,
+        586,
+        6,
+        0
+      ],
+      [
+        1107,
+        408,
+        44,
+        1
+      ],
+      [
+        5,
+        4,
+        154,
+        75
+      ],
+      [
+        0,
+        0,
+        89,
+        219
+      ]
+    ],
+    "roc_auc_ovr_macro": null
+  },
+  "test_metrics": {
+    "accuracy": 0.5235760971055089,
+    "precision_macro": 0.4724685012176984,
+    "recall_macro": 0.5114751476931949,
+    "f1_macro": 0.47257589729298327,
+    "precision_weighted": 0.5009857602690212,
+    "recall_weighted": 0.5235760971055089,
+    "f1_weighted": 0.4953249055631199,
+    "confusion_matrix": [
+      [
+        1467,
+        524,
+        38,
+        0
+      ],
+      [
+        1028,
+        376,
+        214,
+        1
+      ],
+      [
+        1,
+        14,
+        336,
+        85
+      ],
+      [
+        0,
+        0,
+        136,
+        64
+      ]
+    ],
+    "roc_auc_ovr_macro": null
+  }
+}

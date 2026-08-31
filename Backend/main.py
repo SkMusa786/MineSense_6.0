@@ -15,12 +15,32 @@ from pathlib import Path
 
 
 # ==========================================
-# MQTT BROKER CONFIGURATION
+# RUNTIME / DEPLOYMENT CONFIGURATION
 # ==========================================
 
-MQTT_BROKER = "127.0.0.1"
-MQTT_PORT = 1883
-MQTT_TOPIC = "mine/sensors"
+PORT = int(os.getenv("PORT", "8001"))
+HOST = os.getenv("HOST", "0.0.0.0")
+
+MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
+MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
+MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "mine/sensors")
+
+
+def _build_mqtt_client():
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    if MQTT_USE_TLS:
+        client.tls_set()
+    return client
+
+
+# ==========================================
+# MQTT BROKER CONFIGURATION
+# ==========================================
 
 # MQTT client will be initialized on startup
 mqtt_client = None
@@ -86,14 +106,14 @@ async def lifespan(app: FastAPI):
     
     # Startup: Initialize and start MQTT client
     print("[MQTT] Initializing MQTT client...")
-    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    mqtt_client = _build_mqtt_client()
     mqtt_client.on_connect = on_mqtt_connect
     mqtt_client.on_message = on_mqtt_message
     
     try:
-        mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, 60)
         mqtt_client.loop_start()
-        print(f"[MQTT] Connected to {MQTT_BROKER}:{MQTT_PORT}")
+        print(f"[MQTT] Connected to {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
     except Exception as e:
         print(f"[MQTT] Failed to connect to broker: {e}")
         print("[MQTT] Backend will still work; POST /predict can accept sensor data via HTTP")
@@ -153,7 +173,7 @@ for horizon in [4, 6]:
 # SQLITE DATABASE
 # ==========================================
 
-DB_NAME = "subsidence_history.db"
+DB_NAME = str(BASE_DIR / "subsidence_history.db")
 
 
 def init_database():
@@ -977,6 +997,12 @@ def _predict_and_store(data_dict):
     except Exception as e:
         print(f"[PREDICT] Error processing {data_dict.get('node_id', 'UNKNOWN')}: {e}")
         raise
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=False)
 
 
 @app.post("/predict")

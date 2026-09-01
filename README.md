@@ -11,9 +11,6 @@
 ![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)
 ![Render](https://img.shields.io/badge/Render-Deployment-46E3B7?logo=render&logoColor=black)
 
-**MineSense is an AI-powered smart mine safety platform that continuously monitors ground deformation, predicts subsidence risk, and provides real-time early warnings through an intelligent web dashboard.**
-
-
 
 
 

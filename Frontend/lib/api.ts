@@ -2,11 +2,11 @@ import type { MineNode, PredictRequest, PredictResponse } from './types'
 
 /**
  * Base URL for the existing FastAPI backend.
- * Configure via NEXT_PUBLIC_API_URL — never hard-code the production URL.
- * Falls back to the local development endpoint (8001 to avoid port conflicts).
+ * Configure via NEXT_PUBLIC_API_URL in production and local development.
+ * Leave empty to use the same-origin host when the backend is served from the
+ * same deployment domain or reverse proxy.
  */
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8001'
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 export interface PredictResult {
   ok: boolean

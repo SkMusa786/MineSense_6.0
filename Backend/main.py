@@ -7,9 +7,9 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import sqlite3
-import paho.mqtt.client as mqtt
 import json
 import threading
+import math
 import os
 from pathlib import Path
 
@@ -21,110 +21,102 @@ from pathlib import Path
 PORT = int(os.getenv("PORT", "8001"))
 HOST = os.getenv("HOST", "0.0.0.0")
 
-MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
-MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
-MQTT_USERNAME = os.getenv("MQTT_USERNAME")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
-MQTT_USE_TLS = os.getenv("MQTT_USE_TLS", "false").strip().lower() in {"1", "true", "yes", "on"}
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "mine/sensors")
-
-
-def _build_mqtt_client():
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    if MQTT_USERNAME and MQTT_PASSWORD:
-        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-    if MQTT_USE_TLS:
-        client.tls_set()
-    return client
+DEMO_SENSOR_ENABLED = os.getenv("DEMO_SENSOR_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+DEMO_SENSOR_CYCLE_SECONDS = max(1, int(os.getenv("DEMO_SENSOR_CYCLE_SECONDS", "5")))
 
 
 # ==========================================
-# MQTT BROKER CONFIGURATION
+# DEMO SENSOR SIMULATOR
 # ==========================================
 
-# MQTT client will be initialized on startup
-mqtt_client = None
-mqtt_lock = threading.Lock()
+DEMO_NODE_IDS = ["N01", "N02", "N03", "N04", "N05", "N06", "N07", "N08"]
+
+DEMO_NODE_BASELINES = {
+    "N01": {"tilt_x_deg": 0.08, "tilt_y_deg": 0.06, "displacement_mm": 2.1, "vibration_g": 0.018, "crack_width_mm": 0.01, "tilt_step_x": 0.0012, "tilt_step_y": 0.0011, "disp_step": 0.012, "vib_step": 0.00018, "crack_step": 0.0005, "phase": 0.6},
+    "N02": {"tilt_x_deg": 0.24, "tilt_y_deg": 0.19, "displacement_mm": 2.45, "vibration_g": 0.022, "crack_width_mm": 0.025, "tilt_step_x": 0.0065, "tilt_step_y": 0.0054, "disp_step": 0.08, "vib_step": 0.0009, "crack_step": 0.003, "phase": 1.2},
+    "N03": {"tilt_x_deg": 0.54, "tilt_y_deg": 0.38, "displacement_mm": 5.9, "vibration_g": 0.042, "crack_width_mm": 0.17, "tilt_step_x": 0.016, "tilt_step_y": 0.0135, "disp_step": 0.18, "vib_step": 0.0018, "crack_step": 0.006, "phase": 1.8},
+    "N04": {"tilt_x_deg": 0.82, "tilt_y_deg": 0.66, "displacement_mm": 7.8, "vibration_g": 0.062, "crack_width_mm": 0.26, "tilt_step_x": 0.028, "tilt_step_y": 0.024, "disp_step": 0.32, "vib_step": 0.0034, "crack_step": 0.012, "phase": 2.3},
+    "N05": {"tilt_x_deg": 0.09, "tilt_y_deg": 0.07, "displacement_mm": 2.2, "vibration_g": 0.019, "crack_width_mm": 0.01, "tilt_step_x": 0.0013, "tilt_step_y": 0.0012, "disp_step": 0.014, "vib_step": 0.0002, "crack_step": 0.0006, "phase": 2.7},
+    "N06": {"tilt_x_deg": 0.33, "tilt_y_deg": 0.27, "displacement_mm": 3.4, "vibration_g": 0.026, "crack_width_mm": 0.04, "tilt_step_x": 0.011, "tilt_step_y": 0.009, "disp_step": 0.12, "vib_step": 0.0012, "crack_step": 0.004, "phase": 3.1},
+    "N07": {"tilt_x_deg": 0.045, "tilt_y_deg": 0.032, "displacement_mm": 1.55, "vibration_g": 0.012, "crack_width_mm": 0.008, "tilt_step_x": 0.0009, "tilt_step_y": 0.0008, "disp_step": 0.006, "vib_step": 0.00012, "crack_step": 0.0002, "phase": 3.6},
+    "N08": {"tilt_x_deg": 0.057, "tilt_y_deg": 0.041, "displacement_mm": 1.76, "vibration_g": 0.014, "crack_width_mm": 0.009, "tilt_step_x": 0.001, "tilt_step_y": 0.0009, "disp_step": 0.0065, "vib_step": 0.00015, "crack_step": 0.0002, "phase": 4.1},
+}
 
 
-def on_mqtt_connect(client, userdata, flags, reason_code, properties):
-    """Callback when MQTT client connects."""
-    print(f"[MQTT] Connected to broker with result code {reason_code}")
-    client.subscribe(MQTT_TOPIC)
-    print(f"[MQTT] Subscribed to topic: {MQTT_TOPIC}")
+def _build_demo_sensor_payload(node_id: str, cycle_index: int):
+    base = DEMO_NODE_BASELINES[node_id]
+    wave = cycle_index * (0.45 + base["phase"] * 0.12)
+    variation = math.sin(wave)
+    tilt_x = base["tilt_x_deg"] + (cycle_index * base["tilt_step_x"]) + (variation * 0.03)
+    tilt_y = base["tilt_y_deg"] + (cycle_index * base["tilt_step_y"]) + (math.cos(wave * 0.9) * 0.025)
+    displacement = base["displacement_mm"] + (cycle_index * base["disp_step"]) + (math.sin(wave * 0.7) * 0.18)
+    vibration = base["vibration_g"] + (cycle_index * base["vib_step"]) + (math.cos(wave * 0.8) * 0.004)
+    crack = base["crack_width_mm"] + (cycle_index * base["crack_step"]) + (math.sin(wave * 0.9) * 0.02)
+
+    return {
+        "node_id": node_id,
+        "timestamp_utc": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        "tilt_x_deg": round(max(0.0, float(tilt_x)), 4),
+        "tilt_y_deg": round(max(0.0, float(tilt_y)), 4),
+        "displacement_mm": round(max(0.0, float(displacement)), 4),
+        "vibration_g": round(max(0.0, float(vibration)), 4),
+        "crack_width_mm": round(max(0.0, float(crack)), 4),
+    }
 
 
-def on_mqtt_message(client, userdata, msg):
-    """Callback when MQTT message is received."""
-    try:
-        payload = json.loads(msg.payload.decode())
-        print(f"[MQTT] Received message: {payload}")
-        
-        # Extract sensor data
-        sensor_data = {
-            "node_id": payload.get("node_id"),
-            "timestamp_utc": payload.get("timestamp_utc"),
-            "tilt_x_deg": payload.get("tilt_x_deg"),
-            "tilt_y_deg": payload.get("tilt_y_deg"),
-            "displacement_mm": payload.get("displacement_mm"),
-            "vibration_g": payload.get("vibration_g"),
-            "crack_width_mm": payload.get("crack_width_mm"),
-        }
-        
-        # Process the sensor reading (will be called by predict logic)
-        threading.Thread(target=_process_sensor_reading, args=(sensor_data,), daemon=True).start()
-        
-    except json.JSONDecodeError:
-        print(f"[MQTT] Invalid JSON received: {msg.payload.decode()}")
-    except Exception as e:
-        print(f"[MQTT] Error processing message: {e}")
+demo_simulator_thread = None
+demo_simulator_stop = threading.Event()
+demo_simulator_lock = threading.Lock()
 
 
-def _process_sensor_reading(sensor_data):
-    """Process a sensor reading received from MQTT."""
-    # This will be called asynchronously from MQTT callback
-    # We'll populate the predict logic inline to update node_predictions
-    try:
-        # Validate required fields
-        if not all(k in sensor_data for k in ["node_id", "timestamp_utc", "tilt_x_deg", "tilt_y_deg", "displacement_mm", "vibration_g", "crack_width_mm"]):
-            print(f"[MQTT] Missing required fields in sensor data")
-            return
-        
-        # Import here to avoid circular dependency
-        # This mimics the /predict endpoint logic
-        with mqtt_lock:
-            _predict_and_store(sensor_data)
-            
-    except Exception as e:
-        print(f"[MQTT] Error in _process_sensor_reading: {e}")
+def _seed_demo_predictions():
+    for node_id in DEMO_NODE_IDS:
+        payload = _build_demo_sensor_payload(node_id, 0)
+        try:
+            with demo_simulator_lock:
+                _predict_and_store(payload)
+        except Exception as exc:
+            print(f"[DEMO] Bootstrap failed for {node_id}: {exc}")
+
+
+def _demo_sensor_loop():
+    cycle_index = 0
+    print("[DEMO] Starting 8-node real-time sensor simulator")
+    while not demo_simulator_stop.is_set():
+        cycle_index += 1
+        for node_id in DEMO_NODE_IDS:
+            if demo_simulator_stop.is_set():
+                break
+            payload = _build_demo_sensor_payload(node_id, cycle_index)
+            try:
+                with demo_simulator_lock:
+                    _predict_and_store(payload)
+            except Exception as exc:
+                print(f"[DEMO] Failed to process {node_id}: {exc}")
+        demo_simulator_stop.wait(DEMO_SENSOR_CYCLE_SECONDS)
+    print("[DEMO] Sensor simulator stopped")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI lifespan context manager for MQTT startup/shutdown."""
-    global mqtt_client
-    
-    # Startup: Initialize and start MQTT client
-    print("[MQTT] Initializing MQTT client...")
-    mqtt_client = _build_mqtt_client()
-    mqtt_client.on_connect = on_mqtt_connect
-    mqtt_client.on_message = on_mqtt_message
-    
-    try:
-        mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, 60)
-        mqtt_client.loop_start()
-        print(f"[MQTT] Connected to {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
-    except Exception as e:
-        print(f"[MQTT] Failed to connect to broker: {e}")
-        print("[MQTT] Backend will still work; POST /predict can accept sensor data via HTTP")
-    
+    """FastAPI lifespan hook for startup/shutdown of the demo simulator."""
+    global demo_simulator_thread
+
+    if DEMO_SENSOR_ENABLED:
+        demo_simulator_stop.clear()
+        _seed_demo_predictions()
+        demo_simulator_thread = threading.Thread(target=_demo_sensor_loop, name="demo-sensor-simulator", daemon=True)
+        demo_simulator_thread.start()
+        print(f"[DEMO] Demo sensor simulator active ({DEMO_SENSOR_CYCLE_SECONDS}s cycle)")
+    else:
+        print("[DEMO] Demo simulator disabled via DEMO_SENSOR_ENABLED")
+
     yield
-    
-    # Shutdown: Stop MQTT client
-    if mqtt_client:
-        mqtt_client.loop_stop()
-        mqtt_client.disconnect()
-        print("[MQTT] Disconnected from broker")
+
+    if demo_simulator_thread and demo_simulator_thread.is_alive():
+        demo_simulator_stop.set()
+        demo_simulator_thread.join(timeout=8)
+        print("[DEMO] Demo sensor simulator shut down")
 
 
 app = FastAPI(title="Mine Subsidence Monitoring API", lifespan=lifespan)

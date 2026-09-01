@@ -126,14 +126,24 @@ app = FastAPI(title="Mine Subsidence Monitoring API", lifespan=lifespan)
 # CORS
 # ==========================================
 
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://minesense-frontend.onrender.com",
+    "https://minesense.onrender.com",
+]
+
+CORS_ORIGINS = []
+for origin in (os.getenv("CORS_ORIGINS", "").split(",") + DEFAULT_CORS_ORIGINS):
+    cleaned = origin.strip()
+    if cleaned:
+        CORS_ORIGINS.append(cleaned)
+
+CORS_ORIGINS = list(dict.fromkeys(CORS_ORIGINS))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in CORS_ORIGINS if origin.strip()],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

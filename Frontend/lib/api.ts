@@ -2,11 +2,14 @@ import type { MineNode, PredictRequest, PredictResponse } from './types'
 
 /**
  * Base URL for the existing FastAPI backend.
- * Configure via NEXT_PUBLIC_API_URL in production and local development.
- * Leave empty to use the same-origin host when the backend is served from the
- * same deployment domain or reverse proxy.
+ * In production, use NEXT_PUBLIC_API_URL and fall back to the deployed Render
+ * backend. Local development keeps localhost support.
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
+const DEFAULT_API_BASE_URL = 'https://minesense-backend.onrender.com'
+
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_BASE_URL)
+  .trim()
+  .replace(/\/+$/, '')
 
 export interface PredictResult {
   ok: boolean

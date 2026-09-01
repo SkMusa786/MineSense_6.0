@@ -1,102 +1,66 @@
 # MineSense – AI-Powered Real-Time Mine Subsidence Monitoring & Early Warning System
 
-![Python](https://img.shields.io/badge/Python-3.x-blue?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.141+-009688?logo=fastapi&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-009688?logo=fastapi&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16.3.3-000000?logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
-![Scikit-learn](https://img.shields.io/badge/Scikit--learn-Random%20Forest-F7931E?logo=scikit-learn&logoColor=white)
-![Pandas](https://img.shields.io/badge/Pandas-Data%20Processing-150458?logo=pandas&logoColor=white)
-![NumPy](https://img.shields.io/badge/NumPy-Data%20Processing-013243?logo=numpy&logoColor=white)
+![Scikit--learn](https://img.shields.io/badge/Scikit--learn-Random%20Forest-F7931E?logo=scikit-learn&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-3.0.5-150458?logo=pandas&logoColor=white)
+![NumPy](https://img.shields.io/badge/NumPy-2.5.2-013243?logo=numpy&logoColor=white)
+![Joblib](https://img.shields.io/badge/Joblib-Model%20Loading-5A5A5A)
 ![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)
 ![Render](https://img.shields.io/badge/Render-Deployment-46E3B7?logo=render&logoColor=black)
 
+## Overview
 
+**MineSense** is an AI-powered mine safety system that continuously monitors ground-deformation conditions across **8 sensor nodes**, analyzes sensor data using **Random Forest machine-learning models**, predicts current and future subsidence risk, and provides **early-warning alerts** through a real-time web dashboard.
 
+The current deployed hackathon demo runs in **simulator mode**. It uses an integrated 8-node software simulator to generate changing sensor readings without requiring MQTT or an external broker.
 
-MineSense 6.0
+## Live Demo
 
-AI-Enabled Smart Mine Subsidence Monitoring & Early Warning System
+**Frontend:**  
+https://minesense-6-0.onrender.com
 
-MineSense 6.0 is a student-friendly AI + IoT platform for real-time mine subsidence monitoring and early warning. It uses 8 simulated sensor nodes to monitor four parameters: tilt, displacement, vibration, and crack width.
+**Backend API:**  
+https://minesense-backend.onrender.com
 
-Main Workflow
+**API Documentation:**  
+https://minesense-backend.onrender.com/docs
 
-8 Sensor Nodes
-      ↓
-MQTT / IoT Gateway
-      ↓
-FastAPI Backend
-      ↓
-Feature Engineering + Random Forest ML
-      ↓
-Risk & Future Prediction
-      ↓
-SQLite Historical Data
-      ↓
-Next.js Dashboard
-      ↓
-Early Warning
+## Key Features
 
-Key Features
+- Real-time monitoring of **8 nodes: N01–N08**
+- Tilt monitoring
+- Displacement monitoring
+- Vibration monitoring
+- Crack-width monitoring
+- Current subsidence-risk classification
+- Risk probability estimation
+- Future-risk prediction for approximately **4 hours and 6 hours**
+- Early-warning detection
+- Highest-risk node identification
+- Historical sensor and prediction data
+- Real-time dashboard
+- REST API
+- Risk alerts and forecasts
 
-8-node (sensor network simulation)
+## System Architecture
 
-1.Real-time MQTT data flow
-
-2.Tilt, displacement, vibration and crack-width monitoring
-
-3.Random Forest based current and future risk prediction
-
-4.Risk levels: Normal, Watch, Warning, Critical
-
-5.Historical data storage and trend analysis
-
-6.Interactive web dashboard
-
-7.Scalable architecture for future physical sensor deployment
-
-Current Status
-
-The complete software prototype works locally using simulated MQTT sensor data.
-
-Cloud demonstration deployments:
-
-Frontend: https://minesense-6-0.onrender.com
-
-Backend: https://minesense-backend.onrender.com
-
-API Docs: https://minesense-backend.onrender.com/docs
-
-For full real-world deployment, sensor_publisher.py must be replaced/connected to a physical sensor gateway and secured MQTT infrastructure so real-time field data can reach the cloud backend.
-
-Run Locally
-
-Terminal 1 – Backend
-
-cd Backend
-py -3.12 -m uvicorn main:app --host 127.0.0.1 --port 8001
-
-Terminal 2 – Sensor Publisher
-
-cd Backend
-py -3.12 sensor_publisher.py
-
-Terminal 3 – Frontend
-
-cd Frontend
-npm run dev
-
-Open: http://localhost:3000
-
-Innovation
-
-Wireless Surface Mesh Network for Real-Time Subsidence Detection
-
-MineSense combines distributed sensing, MQTT communication, AI/ML prediction and dashboard visualization to identify abnormal ground movement and support early safety decisions.
-
-Future Deployment
-
-The next stage is to integrate ESP32/low-cost sensor nodes + wireless mesh/LoRa/Zigbee/Wi-Fi gateway + production MQTT broker, followed by field calibration and validation.
-
-Detect Early. Predict Intelligently. Protect Safely.
+```text
+8-Node Real-Time Simulator
+            ↓
+      FastAPI Backend
+            ↓
+     Feature Engineering
+            ↓
+       Random Forest ML
+            ↓
+ Current + Future Risk Prediction
+            ↓
+      SQLite Historical Data
+            ↓
+       Next.js Dashboard
+            ↓
+       Early-Warning Alerts

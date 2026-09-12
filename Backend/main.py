@@ -13,6 +13,11 @@ import math
 import os
 from pathlib import Path
 
+try:
+    import psycopg2
+except ImportError:
+    psycopg2 = None
+
 
 # ==========================================
 # RUNTIME / DEPLOYMENT CONFIGURATION
@@ -23,6 +28,12 @@ HOST = os.getenv("HOST", "0.0.0.0")
 
 DEMO_SENSOR_ENABLED = os.getenv("DEMO_SENSOR_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 DEMO_SENSOR_CYCLE_SECONDS = max(1, int(os.getenv("DEMO_SENSOR_CYCLE_SECONDS", "5")))
+
+CLOUD_DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+CLOUD_SYNC_ENABLED = os.getenv("CLOUD_SYNC_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+CLOUD_SYNC_INTERVAL_SECONDS = max(30, int(os.getenv("CLOUD_SYNC_INTERVAL_SECONDS", "60")))
+cloud_sync_thread = None
+cloud_sync_stop = threading.Event()
 
 
 # ==========================================
@@ -102,6 +113,8 @@ async def lifespan(app: FastAPI):
     """FastAPI lifespan hook for startup/shutdown of the demo simulator."""
     global demo_simulator_thread
 
+    start_cloud_sync()
+
     if DEMO_SENSOR_ENABLED:
         demo_simulator_stop.clear()
         _seed_demo_predictions()
@@ -117,6 +130,8 @@ async def lifespan(app: FastAPI):
         demo_simulator_stop.set()
         demo_simulator_thread.join(timeout=8)
         print("[DEMO] Demo sensor simulator shut down")
+
+    stop_cloud_sync()
 
 
 app = FastAPI(title="Mine Subsidence Monitoring API", lifespan=lifespan)
@@ -199,9 +214,17 @@ def init_database():
             crack_change_mm REAL,
             displacement_vs_neighbor_mm REAL,
             risk_level TEXT,
-            probability REAL
+            probability REAL,
+            cloud_synced INTEGER DEFAULT 0
         )
     """)
+
+    cursor.execute("PRAGMA table_info(sensor_history)")
+    sensor_columns = {row[1] for row in cursor.fetchall()}
+    if "cloud_synced" not in sensor_columns:
+        cursor.execute(
+            "ALTER TABLE sensor_history ADD COLUMN cloud_synced INTEGER DEFAULT 0"
+        )
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS forecast_history (
@@ -220,6 +243,220 @@ def init_database():
 
 
 init_database()
+
+
+# ==========================================
+# CLOUD POSTGRESQL + OFFLINE SYNCHRONIZATION
+# ==========================================
+
+def _cloud_available():
+    return bool(CLOUD_DATABASE_URL) and psycopg2 is not None
+
+
+def init_cloud_database():
+    if not CLOUD_SYNC_ENABLED:
+        print("[CLOUD] Cloud sync disabled")
+        return False
+
+    if not CLOUD_DATABASE_URL:
+        print("[CLOUD] DATABASE_URL not configured; using SQLite only")
+        return False
+
+    if psycopg2 is None:
+        print("[CLOUD] psycopg2-binary not installed; using SQLite only")
+        return False
+
+    try:
+        conn = psycopg2.connect(CLOUD_DATABASE_URL, connect_timeout=8)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sensor_history (
+                id SERIAL PRIMARY KEY,
+                node_id TEXT NOT NULL,
+                timestamp_utc TEXT NOT NULL,
+                tilt_x_deg DOUBLE PRECISION,
+                tilt_y_deg DOUBLE PRECISION,
+                tilt_magnitude_deg DOUBLE PRECISION,
+                displacement_mm DOUBLE PRECISION,
+                displacement_change_mm DOUBLE PRECISION,
+                displacement_rate_mm_per_hour DOUBLE PRECISION,
+                vibration_g DOUBLE PRECISION,
+                crack_width_mm DOUBLE PRECISION,
+                crack_change_mm DOUBLE PRECISION,
+                displacement_vs_neighbor_mm DOUBLE PRECISION,
+                risk_level TEXT,
+                probability DOUBLE PRECISION,
+                UNIQUE(node_id, timestamp_utc)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS forecast_history (
+                id SERIAL PRIMARY KEY,
+                node_id TEXT NOT NULL,
+                prediction_timestamp TEXT NOT NULL,
+                horizon_hours INTEGER NOT NULL,
+                predicted_risk TEXT,
+                probability DOUBLE PRECISION,
+                early_warning INTEGER DEFAULT 0,
+                UNIQUE(node_id, prediction_timestamp, horizon_hours)
+            )
+        """)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("[CLOUD] PostgreSQL connected; cloud tables verified")
+        return True
+
+    except Exception as exc:
+        print(f"[CLOUD] PostgreSQL unavailable: {exc}")
+        return False
+
+
+def sync_sqlite_to_cloud():
+    if not CLOUD_SYNC_ENABLED or not _cloud_available():
+        return
+
+    local_conn = None
+    cloud_conn = None
+
+    try:
+        local_conn = sqlite3.connect(DB_NAME)
+        local_cursor = local_conn.cursor()
+
+        local_cursor.execute("""
+            SELECT id, node_id, timestamp_utc, tilt_x_deg, tilt_y_deg,
+                   tilt_magnitude_deg, displacement_mm,
+                   displacement_change_mm, displacement_rate_mm_per_hour,
+                   vibration_g, crack_width_mm, crack_change_mm,
+                   displacement_vs_neighbor_mm, risk_level, probability
+            FROM sensor_history
+            WHERE COALESCE(cloud_synced, 0) = 0
+            ORDER BY id
+            LIMIT 500
+        """)
+        sensor_rows = local_cursor.fetchall()
+
+        local_cursor.execute("""
+            SELECT node_id, prediction_timestamp, horizon_hours,
+                   predicted_risk, probability, early_warning
+            FROM forecast_history
+            ORDER BY id
+            LIMIT 500
+        """)
+        forecast_rows = local_cursor.fetchall()
+
+        if not sensor_rows and not forecast_rows:
+            local_conn.close()
+            return
+
+        cloud_conn = psycopg2.connect(CLOUD_DATABASE_URL, connect_timeout=8)
+        cloud_cursor = cloud_conn.cursor()
+
+        synced_sensor_ids = []
+
+        for row in sensor_rows:
+            cloud_cursor.execute("""
+                INSERT INTO sensor_history (
+                    node_id, timestamp_utc, tilt_x_deg, tilt_y_deg,
+                    tilt_magnitude_deg, displacement_mm,
+                    displacement_change_mm, displacement_rate_mm_per_hour,
+                    vibration_g, crack_width_mm, crack_change_mm,
+                    displacement_vs_neighbor_mm, risk_level, probability
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s
+                )
+                ON CONFLICT (node_id, timestamp_utc) DO NOTHING
+            """, row[1:])
+            synced_sensor_ids.append(row[0])
+
+        for row in forecast_rows:
+            cloud_cursor.execute("""
+                INSERT INTO forecast_history (
+                    node_id, prediction_timestamp, horizon_hours,
+                    predicted_risk, probability, early_warning
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (
+                    node_id, prediction_timestamp, horizon_hours
+                ) DO NOTHING
+            """, row)
+
+        cloud_conn.commit()
+
+        if synced_sensor_ids:
+            local_cursor.executemany(
+                "UPDATE sensor_history SET cloud_synced = 1 WHERE id = ?",
+                [(record_id,) for record_id in synced_sensor_ids]
+            )
+            local_conn.commit()
+
+        print(f"[CLOUD] Sync complete: {len(synced_sensor_ids)} sensor records, {len(forecast_rows)} forecast records")
+
+    except Exception as exc:
+        if cloud_conn is not None:
+            try:
+                cloud_conn.rollback()
+            except Exception:
+                pass
+        print(f"[CLOUD] Sync failed; local records retained for retry: {exc}")
+
+    finally:
+        if cloud_conn is not None:
+            try:
+                cloud_conn.close()
+            except Exception:
+                pass
+        if local_conn is not None:
+            try:
+                local_conn.close()
+            except Exception:
+                pass
+
+
+def _cloud_sync_loop():
+    print(f"[CLOUD] Background sync active (every {CLOUD_SYNC_INTERVAL_SECONDS}s)")
+    while not cloud_sync_stop.wait(CLOUD_SYNC_INTERVAL_SECONDS):
+        sync_sqlite_to_cloud()
+
+
+def start_cloud_sync():
+    global cloud_sync_thread
+
+    if not CLOUD_SYNC_ENABLED:
+        return
+
+    init_cloud_database()
+
+    if not _cloud_available():
+        return
+
+    cloud_sync_stop.clear()
+    sync_sqlite_to_cloud()
+
+    if cloud_sync_thread is None or not cloud_sync_thread.is_alive():
+        cloud_sync_thread = threading.Thread(
+            target=_cloud_sync_loop,
+            name="cloud-sync-worker",
+            daemon=True,
+        )
+        cloud_sync_thread.start()
+
+
+def stop_cloud_sync():
+    global cloud_sync_thread
+
+    cloud_sync_stop.set()
+
+    if cloud_sync_thread and cloud_sync_thread.is_alive():
+        cloud_sync_thread.join(timeout=5)
+
+    sync_sqlite_to_cloud()
+    cloud_sync_thread = None
 
 
 # ==========================================

@@ -39,13 +39,13 @@ MineSense is designed to continuously monitor distributed sensing points, identi
 
 | PS Requirement | MineSense Approach | Status |
 |---|---|---|
-| Low-cost distributed nodes | ESP32-based low-cost node architecture | 🟡 Prototype / integration |
-| Tilt / inclination | MPU6050 → Tilt X, Tilt Y, Tilt Magnitude | 🟢 Implemented in prototype |
-| Displacement | Distance/displacement sensing and derived features | 🟢 Prototype |
-| Vibration | SW-420 vibration sensing concept | 🟢 Prototype |
-| Crack/deformation | Crack-width/deformation feature; potentiometer as prototype representation | 🟢 Prototype |
-| Wireless surface WSN | LoRa-based multi-hop/tree-routing architecture | 🟡 Integration stage |
-| Node-to-node communication | Dynamic parent/next-hop toward gateway | 🟡 Proposed / integration |
+| Low-cost distributed nodes | ESP32-based low-cost node architecture | 🟢 Implemented |
+| Tilt / inclination | MPU6050 → Tilt X, Tilt Y, Tilt Magnitude | 🟢 Implemented in hardware prototype |
+| Displacement | Distance/displacement sensing and derived features | 🟢 Implemented in hardware prototype |
+| Vibration | SW-420 vibration sensing concept | 🟢 Implemented in hardware prototype |
+| Crack/deformation | Crack-width/deformation feature; potentiometer as prototype representation | 🟢 Implemented in hardware prototype |
+| Wireless surface WSN | LoRa-based multi-hop/tree-routing architecture | 🟢 Implemented |
+| Node-to-node communication | Dynamic parent/next-hop toward gateway | 🟢 Implemented |
 | Real-time processing | FastAPI backend + simulator | 🟢 Implemented |
 | Abnormal-pattern detection | Feature engineering + Random Forest | 🟢 Implemented |
 | Current risk classification | Normal / Watch / Warning / Critical | 🟢 Implemented |
@@ -55,13 +55,13 @@ MineSense is designed to continuously monitor distributed sensing points, identi
 | Historical data | SQLite + cloud PostgreSQL | 🟢 Implemented |
 | Offline-friendly operation | Local buffering + cloud synchronization | 🟢 Implemented |
 | GIS/spatial visualization | Node-location/risk visualization architecture | 🟡 Enhancement |
-| GPS localization | Latitude/longitude for node localization | 🟡 Planned |
-| SMS notification | External alert-service integration | 🟡 Planned |
+| GPS localization | Latitude/longitude for node localization | 🟢 Implemented |
+| SMS notification | External alert-service integration | 🟢 Implemented |
 | Multi-coalfield scalability | Modular API/database/node architecture | 🟡 Architecture |
 | Low-power field deployment | Low-power hardware architecture | 🟡 Validation pending |
 | Field validation | Real mine-data calibration/testing | ⚪ Not yet validated |
 
-> **Transparency:** The deployed hackathon demo currently runs in **software-simulator mode**. Physical LoRa mesh, MQTT, GPS and SMS are not claimed as fully integrated in the current deployment.
+> **Transparency:** The MineSense hardware prototype is completed, including wireless LoRa surface networking and node-to-node communication. GPS localization and SMS notification are also integrated. The deployed software platform currently runs in software-simulator mode for the online demonstration.
 
 ---
 
